@@ -1,0 +1,88 @@
+---
+title: "lab 8"
+author: "Drew Andersen"
+date: "11/16/2021"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(modelsummary)
+library(corrplot)
+library(broom)
+library(here)
+library(janitor)
+```
+
+```{r}
+homes <- read_csv(here("slo_homes.csv")) %>% 
+  clean_names()
+```
+
+Create a subset for specific cities with summary table
+```{r}
+home_subset <- homes %>% 
+  filter(city %in% c("San Luis Obispo", "Atascadero","Arroyo Grande","Santa Maria-Orcutt"))
+
+home_subset_summary <- home_subset %>% 
+  group_by(city, status) %>% 
+  summarize(mean = mean(price),
+            std = sd(price))
+```
+
+```{r}
+ggplot(data = home_subset, aes(x = sq_ft, y = price)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+Multiple linear regression to investigate relationships between serveral predictor variables and home price.
+Two Differrent Models:
+(1) price ~ city, bedrooms, bathrooms, sqft, status
+(2) price ~ city, sqft, status
+(3) try another
+
+```{r}
+lm1 <- lm(price ~ city + bedrooms + bathrooms + sq_ft + status, data = home_subset)
+
+lm2 <- lm(price ~ city + sq_ft + status, data = home_subset)
+
+lm3 <- lm(price ~ city + bathrooms + sq_ft, data = home_subset)
+```
+Use fct_relevel to specify a new reference level
+
+```{r}
+homes_quant <- home_subset %>% 
+  select(price:sq_ft)
+
+home_cor <- cor(homes_quant)
+corrplot(home_cor)
+```
+Compare AIC values - smaller is better.
+Can't determine which is best ----> use both silly :^] 
+```{r}
+AIC(lm1)
+
+AIC(lm2)
+```
+Use modelsummary() to return multiple model outputs
+```{r}
+modelsummary(list(lm1,lm2,lm3))
+```
+Diagnostic Plots
+```{r}
+plot(lm1)
+```
+If coooks distance is greater than 1, then it is pulling more weight than expected of a single point
+
+Use broom::augment() to return the predictions for existing observations
+Can follow with a histogram of residuals, rather than a QQ plot
+  --> normal distribution is good 
+```{r}
+home_predictions <- augment(lm1)
+
+ggplot(data = home_predictions) +
+  geom_histogram(aes(x=.resid))
+```
+
